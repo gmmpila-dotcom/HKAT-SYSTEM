@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\TutorController;
@@ -17,7 +16,6 @@ use App\Http\Controllers\PayMongoWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StudentProfileController;
 use App\Http\Controllers\Tutor\StudentController;
-use App\Http\Controllers\TutorApplicationController;
 use App\Http\Controllers\TutorProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -42,9 +40,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/admin/sessions', [SessionController::class, 'index'])->name('admin.sessions.index');
     Route::get('/admin/reports', [ReportController::class, 'index'])->name('admin.reports.index');
-    Route::get('/admin/applications', [ApplicationController::class, 'index'])->name('admin.applications.index');
-    Route::patch('/admin/applications/{application}/approve', [ApplicationController::class, 'approve'])->name('admin.applications.approve');
-    Route::patch('/admin/applications/{application}/reject', [ApplicationController::class, 'reject'])->name('admin.applications.reject');
     Route::patch('/admin/payments/{payment}/mark-paid', [SessionController::class, 'markAsPaid'])->name('admin.payments.mark-paid');
     Route::patch('/admin/sessions/{session}/confirm', [SessionController::class, 'confirm'])->name('admin.sessions.confirm');
     Route::patch('/admin/sessions/{session}/complete', [SessionController::class, 'complete'])->name('admin.sessions.complete');
@@ -95,8 +90,6 @@ Route::get('/terms-of-service', function () {
     return Inertia::render('TermsOfService');
 })->name('terms.show');
 
-Route::get('/tutor/apply', [TutorApplicationController::class, 'create'])->name('tutor.apply');
-Route::post('/tutor/apply', [TutorApplicationController::class, 'store'])->name('tutor.apply.store');
 
 Route::get('/tutors', [PublicTutorController::class, 'index'])->name('tutors.index');
 

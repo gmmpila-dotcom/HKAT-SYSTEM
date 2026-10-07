@@ -48,22 +48,6 @@ class DatabaseSeeder extends Seeder
             ['parent_id' => $parent1->id, 'student_name' => 'Leo',  'grade_level' => 'Grade 7', 'created_at' => $now, 'updated_at' => $now],
             ['parent_id' => $parent2->id, 'student_name' => 'Nina', 'grade_level' => 'Grade 2', 'created_at' => $now, 'updated_at' => $now],
         ]);
-
-        DB::table('applications')->insert([
-            [
-                'full_name' => 'Dina Lopez', 'email' => 'applicant1@test.com', 'phone' => '09171234567',
-                'specializations' => json_encode(['Math']), 'years_experience' => '2',
-                'cover_letter' => 'I would like to teach.', 'status' => 'new',
-                'created_at' => $now, 'updated_at' => $now,
-            ],
-            [
-                'full_name' => 'Eric Tan', 'email' => 'applicant2@test.com', 'phone' => '09179876543',
-                'specializations' => json_encode(['Science']), 'years_experience' => '1',
-                'cover_letter' => 'Applying as a tutor.', 'status' => 'new',
-                'created_at' => $now, 'updated_at' => $now,
-            ],
-        ]);
-
         $this->call(RealTutorsSeeder::class);
     }
 }

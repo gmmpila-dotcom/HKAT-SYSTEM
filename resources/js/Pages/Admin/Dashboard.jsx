@@ -41,12 +41,6 @@ export default function Dashboard() {
                             >
                                 Reports
                             </Link>
-                            <Link
-                                href={route('admin.applications.index')}
-                                className="rounded-full bg-[#B8F2E6] px-5 py-2 text-sm font-medium text-gray-800 hover:opacity-80"
-                            >
-                                Tutor Applications
-                            </Link>
                         </div>
                     </div>
                 </div>
