@@ -23,7 +23,7 @@ class TutorProfileController extends Controller
         }
 
         $sessions = TutoringSession::where('tutor_id', $user->id)
-            ->with('studentProfile')
+            ->with(['studentProfile', 'payment:id,session_id,status'])
             ->orderBy('session_date')
             ->orderBy('start_time')
             ->get();

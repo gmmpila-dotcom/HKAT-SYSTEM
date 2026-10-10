@@ -1,7 +1,15 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { formatDate } from '@/utils/formatDate';
 
-export default function Index({ sessions }) {
+const FLASH_BANNERS = {
+    'payment-marked-paid': 'Payment marked as paid.',
+    'session-confirmed': 'Session confirmed.',
+    'session-completed': 'Session completed.',
+    'session-cancelled': 'Session cancelled.',
+};
+
+export default function Index({ sessions, flashStatus }) {
     return (
         <AuthenticatedLayout
             header={
@@ -23,6 +31,14 @@ export default function Index({ sessions }) {
 
             <div className="bg-eggshell py-12">
                 <div className="mx-auto max-w-7xl px-6 lg:px-8">
+                    {flashStatus && FLASH_BANNERS[flashStatus] && (
+                        <div className="mb-6 overflow-hidden rounded-3xl border border-gray-800 bg-white p-5 shadow-sm">
+                            <p className="text-sm font-medium text-gray-800">
+                                {FLASH_BANNERS[flashStatus]}
+                            </p>
+                        </div>
+                    )}
+
                     <div className="overflow-hidden rounded-3xl border border-gray-800 bg-white">
                         <div className="p-6">
                             <div className="mb-6">
@@ -70,7 +86,7 @@ export default function Index({ sessions }) {
                                                     {s.subject}
                                                 </td>
                                                 <td className="px-4 py-5 text-gray-700">
-                                                    {s.session_date}
+                                                    {formatDate(s.session_date)}
                                                 </td>
                                                 <td className="px-4 py-5 text-gray-700">
                                                     {s.start_time} to {s.end_time}

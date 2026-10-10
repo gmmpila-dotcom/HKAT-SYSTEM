@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { formatDate } from '@/utils/formatDate';
 
 const statusStyles = {
     pending: 'bg-gray-200 text-gray-700',
@@ -7,7 +8,7 @@ const statusStyles = {
     failed: 'bg-red-100 text-red-700',
 };
 
-export default function Index({ payments = [], totalDue = 0, totalPaid = 0, flashStatus }) {
+export default function Index({ payments = [], totalDue = 0, totalPaid = 0, flashStatus, onlinePaymentsEnabled = true }) {
     const { post, processing } = useForm();
 
     return (
@@ -54,6 +55,12 @@ export default function Index({ payments = [], totalDue = 0, totalPaid = 0, flas
                             </p>
                         )}
 
+                        {errors.payment && (
+                            <p className="mb-4 rounded-2xl bg-red-100 p-3 text-sm text-red-700">
+                                {errors.payment}
+                            </p>
+                        )}
+
                         {payments.length === 0 && (
                             <p className="text-sm text-gray-600">No payments yet.</p>
                         )}
@@ -80,7 +87,7 @@ export default function Index({ payments = [], totalDue = 0, totalPaid = 0, flas
                                                     {payment.session?.tutor?.name || '-'} &middot; {payment.session?.subject}
                                                 </td>
                                                 <td className="px-4 py-4 text-gray-700">
-                                                    {payment.session?.session_date}
+                                                    {formatDate(payment.session?.session_date)}
                                                 </td>
                                                 <td className="px-4 py-4 text-gray-700">
                                                     &#8369;{Number(payment.amount).toFixed(2)}
@@ -94,14 +101,18 @@ export default function Index({ payments = [], totalDue = 0, totalPaid = 0, flas
                                                         {payment.status}
                                                     </span>
                                                     {payment.status === 'pending' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => post(route('parent.payments.checkout', payment.id))}
-                                                            disabled={processing}
-                                                            className="mt-2 block rounded-full border border-gray-800 bg-[#B8F2E6] px-3 py-1 text-xs font-medium text-gray-800 disabled:opacity-50"
-                                                        >
-                                                            {processing ? 'Opening...' : 'Pay Now'}
-                                                        </button>
+                                                        onlinePaymentsEnabled ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => post(route('parent.payments.checkout', payment.id))}
+                                                                disabled={processing}
+                                                                className="mt-2 block rounded-full border border-gray-800 bg-[#B8F2E6] px-3 py-1 text-xs font-medium text-gray-800 disabled:opacity-50"
+                                                            >
+                                                                {processing ? 'Opening...' : 'Pay Now'}
+                                                            </button>
+                                                        ) : (
+                                                            <p className="mt-2 text-xs text-gray-500">Awaiting payment confirmation.</p>
+                                                        )
                                                     )}
                                                 </td>
                                             </tr>

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import { formatDate } from '@/utils/formatDate';
 
 export default function Index({ students = [] }) {
     return (
@@ -91,7 +92,7 @@ function StudentProgressCard({ student }) {
                                     {s.subject} with {s.tutor ? s.tutor.name : 'Tutor'}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                    {s.session_date} &middot; {s.start_time} to {s.end_time}
+                                    {formatDate(s.session_date)} &middot; {s.start_time} to {s.end_time}
                                 </p>
                             </div>
                             <span className="inline-flex rounded-full bg-gray-200 px-3 py-1 text-xs font-medium text-gray-700">

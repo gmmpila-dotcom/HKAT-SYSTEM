@@ -33,6 +33,7 @@ class DashboardController extends Controller
 
         return Inertia::render('Parent/Dashboard', [
             'sessions' => $sessions,
+            'flashStatus' => session('status'),
         ]);
     }
 }

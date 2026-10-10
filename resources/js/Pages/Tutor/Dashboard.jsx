@@ -1,6 +1,13 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PrimaryButton from '@/Components/PrimaryButton';
 import { Head, Link } from '@inertiajs/react';
+import { formatDate } from '@/utils/formatDate';
+
+const paymentStyles = {
+    pending: 'bg-gray-200 text-gray-700',
+    paid: 'bg-[#B8F2E6] text-gray-800',
+    failed: 'bg-red-100 text-red-700',
+};
 
 export default function Dashboard({ sessions = [] }) {
     return (
@@ -60,7 +67,7 @@ export default function Dashboard({ sessions = [] }) {
                                                 : ''}
                                         </div>
                                         <div className="mt-1 text-sm text-gray-600">
-                                            {session.session_date} from {session.start_time} to {session.end_time}
+                                            {formatDate(session.session_date)} from {session.start_time} to {session.end_time}
                                         </div>
                                         <div className="mt-1 text-sm text-gray-600">
                                             Type: {session.session_type} / Location: {session.location_type}
@@ -69,6 +76,21 @@ export default function Dashboard({ sessions = [] }) {
                                             <span className="inline-flex rounded-full bg-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
                                                 {session.status}
                                             </span>
+                                        </div>
+                                        <div className="mt-2">
+                                            {session.payment ? (
+                                                <span
+                                                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                                                        paymentStyles[session.payment.status] || 'bg-gray-200 text-gray-700'
+                                                    }`}
+                                                >
+                                                    Payment: {session.payment.status}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex rounded-full bg-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
+                                                    Payment: No payment
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

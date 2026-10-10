@@ -26,6 +26,7 @@ class SessionController extends Controller
 
         return Inertia::render('Admin/Sessions/Index', [
             'sessions' => $sessions,
+            'flashStatus' => session('status'),
         ]);
     }
 

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { formatDate } from '@/utils/formatDate';
 
 export default function Show({ conversation }) {
     const user = usePage().props.auth.user;
@@ -32,7 +33,7 @@ export default function Show({ conversation }) {
                     <div className="rounded-3xl border border-gray-800 bg-white p-6 shadow-sm">
                         <p className="mb-5 text-sm text-gray-600">
                             {conversation.session?.subject || 'Tutoring session'}
-                            {conversation.session?.session_date ? ` · ${conversation.session.session_date}` : ''}
+                            {conversation.session?.session_date ? ` · ${formatDate(conversation.session.session_date)}` : ''}
                         </p>
                         <div className="space-y-3">
                             {conversation.messages?.length === 0 && (

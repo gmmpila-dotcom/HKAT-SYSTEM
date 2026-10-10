@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PrimaryButton from '@/Components/PrimaryButton';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { formatDate } from '@/utils/formatDate';
 
 const statusStyles = {
     pending: 'bg-gray-200 text-gray-700',
@@ -15,7 +16,7 @@ const paymentStyles = {
     failed: 'bg-red-100 text-red-700',
 };
 
-export default function Dashboard({ sessions = [] }) {
+export default function Dashboard({ sessions = [], flashStatus }) {
     return (
         <AuthenticatedLayout
             header={
@@ -28,6 +29,14 @@ export default function Dashboard({ sessions = [] }) {
 
             <div className="py-8">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    {flashStatus === 'session-booked' && (
+                        <div className="mb-6 overflow-hidden bg-white p-5 border border-gray-800 rounded-3xl shadow-sm">
+                            <p className="text-sm font-medium text-gray-800">
+                                Session booked. Waiting for admin review.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="overflow-hidden bg-white p-8 border border-gray-800 rounded-3xl shadow-sm">
                         <div className="flex items-center justify-between">
                             <div>
@@ -97,7 +106,7 @@ export default function Dashboard({ sessions = [] }) {
                                                     {session.tutor?.name || '-'} &middot; {session.subject}
                                                 </td>
                                                 <td className="px-4 py-4 text-gray-700">
-                                                    {session.session_date}
+                                                    {formatDate(session.session_date)}
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusStyles[session.status] || statusStyles.pending}`}>

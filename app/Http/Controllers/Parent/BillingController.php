@@ -30,10 +30,13 @@ class BillingController extends Controller
         $totalDue = $payments->where('status', 'pending')->sum('amount');
         $totalPaid = $payments->where('status', 'paid')->sum('amount');
 
+        $onlinePaymentsEnabled = ! empty(config('services.paymongo.secret_key'));
+
         return Inertia::render('Parent/Billing/Index', [
             'payments' => $payments,
             'totalDue' => $totalDue,
             'totalPaid' => $totalPaid,
+            'onlinePaymentsEnabled' => $onlinePaymentsEnabled,
             'flashStatus' => session('status'),
         ]);
     }
