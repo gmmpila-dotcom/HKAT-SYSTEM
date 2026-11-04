@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class SessionStatusNotification extends Notification
@@ -17,7 +18,24 @@ class SessionStatusNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database'];
+        $channels = ['database'];
+        $allowed = array_filter(array_map('trim', explode(',', strtolower((string) env('MAIL_ALLOWED', '')))));
+        $email = strtolower((string) ($notifiable->email ?? ''));
+
+        if ($email !== '' && in_array($email, $allowed, true)) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject($this->title)
+            ->greeting('Hello '.($notifiable->name ?? ''))
+            ->line($this->message)
+            ->action('Open Happy Kid Arts', $this->url);
     }
 
     public function toDatabase(object $notifiable): array

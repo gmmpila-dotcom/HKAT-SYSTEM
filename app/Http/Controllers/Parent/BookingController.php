@@ -9,16 +9,20 @@ use App\Models\TutoringSession;
 use App\Models\TutorProfile;
 use App\Models\User;
 use App\Notifications\SessionStatusNotification;
+use App\Support\RateCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class BookingController extends Controller
 {
+    private ?int $pricingTutor = null;
+
     public function create(Request $request): Response
     {
         $user = $request->user();
@@ -27,26 +31,173 @@ class BookingController extends Controller
             abort(403);
         }
 
+        $ratings = DB::table('reviews')
+            ->join('tutoring_sessions', 'reviews.session_id', '=', 'tutoring_sessions.id')
+            ->select('tutoring_sessions.tutor_id', DB::raw('AVG(reviews.rating) as average'), DB::raw('COUNT(*) as total'))
+            ->groupBy('tutoring_sessions.tutor_id')
+            ->get()
+            ->keyBy('tutor_id');
+
+        $tutors = TutorProfile::with('user:id,name')
+            ->where('is_verified', true)
+            ->whereHas('user', function ($query) {
+                $query->where('role', 'tutor');
+            })
+            ->get()
+            ->map(function (TutorProfile $profile) use ($ratings): array {
+                $rating = $ratings->get($profile->user_id);
+
+                return [
+                    'id' => $profile->user_id,
+                    'profile_id' => $profile->id,
+                    'name' => $profile->user->name,
+                    'photo' => $profile->photo_path,
+                    'credential' => $profile->credential,
+                    'subjects' => $profile->specializations ?? [],
+                    'categories' => $profile->categories ?? [],
+                    'rating' => $rating ? round((float) $rating->average, 1) : null,
+                    'review_count' => $rating ? (int) $rating->total : 0,
+                ];
+            })
+            ->values();
+
         return Inertia::render('Parent/Book', [
-            'tutors' => TutorProfile::with('user:id,name')
-                ->where('is_verified', true)
-                ->whereHas('user', function ($query) {
-                    $query->where('role', 'tutor');
-                })
-                ->get(),
+            'tutors' => $tutors,
             'students' => StudentProfile::where('parent_id', $user->id)
                 ->get(['id', 'student_name', 'grade_level']),
+            'onlinePaymentsEnabled' => ! empty(config('services.paymongo.secret_key')),
         ]);
     }
 
     public function calculateRate(Request $request): JsonResponse
     {
-        $gradeLevel = $request->query('grade_level', '');
-        $sessionType = $request->query('session_type', '1on1');
+        $user = $request->user();
 
-        $rate = self::rateFor($gradeLevel, $sessionType);
+        if ($user->role !== 'parent') {
+            abort(403);
+        }
 
-        return response()->json(['rate' => $rate]);
+        $validated = $request->validate([
+            'student_profile_id' => ['required', 'exists:student_profiles,id'],
+            'subject' => ['required', 'string', 'max:255'],
+            'location_type' => ['required', 'in:onsite,home'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+        ]);
+
+        $this->pricingTutor = $request->integer('tutor_id') ?: null;
+        $student = StudentProfile::where('id', $validated['student_profile_id'])
+            ->where('parent_id', $user->id)
+            ->first();
+
+        if (! $student) {
+            abort(403);
+        }
+
+        return response()->json([
+            'rate' => $this->priceFor(
+                $student,
+                $validated['subject'],
+                $validated['location_type'],
+                $validated['start_time'],
+                $validated['end_time'],
+            ),
+            'kind' => RateCalculator::kind($validated['subject']),
+        ]);
+    }
+
+    public function availability(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->role !== 'parent') {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'session_date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+        ]);
+
+        return response()->json([
+            'unavailable' => $this->busyTutorIds($validated['session_date'], $validated['start_time'], $validated['end_time']),
+        ]);
+    }
+
+    private function busyTutorIds(string $date, string $start, string $end): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->sessionBusyTutorIds($date, $start, $end),
+            $this->offScheduleTutorIds($date, $start, $end),
+        )));
+    }
+
+    /** Tutors who saved weekly availability but are not free for every hour of this request. */
+    private function offScheduleTutorIds(string $date, string $start, string $end): array
+    {
+        $days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        $day = $days[(int) date('w', strtotime($date))];
+
+        [$sh, $sm] = array_map('intval', explode(':', $start));
+        [$eh, $em] = array_map('intval', explode(':', $end));
+        $needed = [];
+        for ($hour = $sh; $hour * 60 < $eh * 60 + $em; $hour++) {
+            $needed[] = sprintf('%02d:00', $hour);
+        }
+
+        $off = [];
+
+        foreach (DB::table('tutor_profiles')->whereNotNull('availability')->get(['user_id', 'availability']) as $row) {
+            $week = json_decode((string) $row->availability, true);
+
+            if (! is_array($week)) {
+                continue;
+            }
+
+            $hasAny = collect($week)->contains(fn ($slots) => is_array($slots) && count($slots) > 0);
+
+            if (! $hasAny) {
+                continue;
+            }
+
+            $slots = is_array($week[$day] ?? null) ? $week[$day] : [];
+
+            if (count(array_diff($needed, $slots)) > 0) {
+                $off[] = (int) $row->user_id;
+            }
+        }
+
+        return $off;
+    }
+
+    private function sessionBusyTutorIds(string $date, string $start, string $end): array
+    {
+        return TutoringSession::whereDate('session_date', $date)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->whereRaw('substr(start_time, 1, 5) < ?', [$end])
+            ->whereRaw('substr(end_time, 1, 5) > ?', [$start])
+            ->pluck('tutor_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function priceFor(StudentProfile $student, string $subject, string $location, string $start, string $end): float
+    {
+        try {
+            return RateCalculator::total(
+                $student->grade_level,
+                $subject,
+                $location,
+                RateCalculator::hours($start, $end), $this->pricingTutor,
+            );
+        } catch (InvalidArgumentException) {
+            throw ValidationException::withMessages([
+                'student_profile_id' => "Please update your child's grade level in the student profile.",
+            ]);
+        }
     }
 
     public function match(Request $request): JsonResponse
@@ -104,28 +255,6 @@ class BookingController extends Controller
 
         return response()->json(['tutors' => $tutors]);
     }
-
-    public static function rateFor(string $gradeLevel, string $sessionType): float
-    {
-        $gradeLevel = strtolower($gradeLevel);
-
-        $base = 300;
-
-        if (str_contains($gradeLevel, 'high') || str_contains($gradeLevel, 'senior')) {
-            $base = 500;
-        } elseif (str_contains($gradeLevel, 'college') || str_contains($gradeLevel, 'university')) {
-            $base = 700;
-        } elseif (str_contains($gradeLevel, 'grade')) {
-            $base = 350;
-        }
-
-        if ($sessionType === 'class') {
-            $base = $base * 0.7;
-        }
-
-        return round($base, 2);
-    }
-
     public function store(Request $request): RedirectResponse
     {
         $user = $request->user();
@@ -145,6 +274,7 @@ class BookingController extends Controller
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
         ]);
 
+        $this->pricingTutor = $request->integer('tutor_id') ?: null;
         $student = StudentProfile::where('id', $validated['student_profile_id'])
             ->where('parent_id', $user->id)
             ->first();
@@ -166,7 +296,19 @@ class BookingController extends Controller
             ]);
         }
 
-        $rateApplied = self::rateFor($student->grade_level, $validated['session_type']);
+        if (in_array((int) $validated['tutor_id'], $this->busyTutorIds($validated['session_date'], $validated['start_time'], $validated['end_time']), true)) {
+            throw ValidationException::withMessages([
+                'tutor_id' => 'This tutor is not available at that time. Please choose another time or tutor.',
+            ]);
+        }
+
+        $rateApplied = $this->priceFor(
+            $student,
+            $validated['subject'],
+            $validated['location_type'],
+            $validated['start_time'],
+            $validated['end_time'],
+        );
 
         DB::transaction(function () use ($student, $validated, $rateApplied) {
             $session = TutoringSession::create([
@@ -201,6 +343,6 @@ class BookingController extends Controller
             route('tutor.dashboard'),
         ));
 
-        return redirect()->route('parent.dashboard')->with('status', 'session-booked');
+        return redirect()->route('parent.billing.index')->with('status', 'session-booked');
     }
 }

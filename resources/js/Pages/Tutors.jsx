@@ -96,13 +96,14 @@ export default function Tutors({ tutors = [] }) {
   const [activeFilter, setActiveFilter] = useState('all');
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return tutors.filter((t) => {
       const matchesFilter = activeFilter === 'all' || (t.categories || []).includes(activeFilter);
-      const matchesQuery =
-        !q ||
-        t.name.toLowerCase().includes(q) ||
-        (t.subjects || []).some((s) => s.toLowerCase().includes(q));
+      const haystack = [t.name, t.credential, ...(t.subjects || [])]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const matchesQuery = words.every((w) => haystack.includes(w));
       return matchesFilter && matchesQuery;
     });
   }, [query, activeFilter, tutors]);

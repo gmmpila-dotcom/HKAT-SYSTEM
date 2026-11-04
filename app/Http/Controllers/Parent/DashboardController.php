@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Parent;
 
 use App\Http\Controllers\Controller;
+use App\Models\StudentProfile;
 use App\Models\TutoringSession;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +25,7 @@ class DashboardController extends Controller
             ->with([
                 'studentProfile:id,parent_id,student_name',
                 'tutor:id,name',
+                'tutor.tutorProfile:id,user_id,photo_path',
                 'payment:id,session_id,status,paid_at',
                 'review:id,session_id,rating,comment',
             ])
@@ -31,8 +33,13 @@ class DashboardController extends Controller
             ->orderBy('start_time')
             ->get();
 
+        $students = StudentProfile::where('parent_id', $user->id)
+            ->with(['progressNotes' => fn ($q) => $q->with('tutor:id,name')->latest()])
+            ->get(['id', 'student_name', 'grade_level']);
+
         return Inertia::render('Parent/Dashboard', [
             'sessions' => $sessions,
+            'students' => $students,
             'flashStatus' => session('status'),
         ]);
     }

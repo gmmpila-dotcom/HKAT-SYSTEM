@@ -1,227 +1,176 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 
-/**
- * Happy Kid Arts and Tutorials — Tutor Profile (database-driven)
- * Drop this in resources/js/Pages/TutorProfile.jsx (replaces the static-data version)
- *
- * Now receives a single `tutor` object as an Inertia prop from
- * PublicTutorController@show, matched by route model binding on
- * /tutors/{tutorProfile}, instead of looking the tutor up in a static file.
- */
+const FONT_HEAD = { fontFamily: "'Playfair Display', Georgia, serif" };
+const DAYS = [['sun', 'SUN'], ['mon', 'MON'], ['tue', 'TUE'], ['wed', 'WED'], ['thu', 'THU'], ['fri', 'FRI'], ['sat', 'SAT']];
 
-function Logo({ className = 'h-9 w-9' }) {
-  const petals = 10;
-  return (
-    <svg viewBox="0 0 100 100" className={className} aria-hidden="true">
-      {Array.from({ length: petals }).map((_, i) => {
-        const hue = (360 / petals) * i;
-        return (
-          <ellipse
-            key={i}
-            cx="50"
-            cy="22"
-            rx="10"
-            ry="20"
-            fill={`hsl(${hue}, 75%, 58%)`}
-            transform={`rotate(${(360 / petals) * i} 50 50)`}
-          />
-        );
-      })}
-      <circle cx="50" cy="50" r="18" fill="#FFD23F" />
-      <circle cx="43" cy="47" r="2.2" fill="#2b2b2b" />
-      <circle cx="57" cy="47" r="2.2" fill="#2b2b2b" />
-      <path d="M42 55 Q50 62 58 55" stroke="#2b2b2b" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-    </svg>
-  );
+function fmtTime(value) {
+    const [h, m] = String(value).split(':').map(Number);
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const hour = h % 12 === 0 ? 12 : h % 12;
+    return hour + ':' + String(m).padStart(2, '0') + ' ' + suffix;
 }
 
-function PillButton({ children, href = '#', variant = 'solid', className = '' }) {
-  const base = 'inline-flex items-center justify-center rounded-full px-6 py-2.5 font-semibold border border-black/80 transition-colors';
-  const styles = {
-    solid: 'bg-[#DCE7C3] hover:bg-[#cfe0ac] text-[#25311f]',
-    outline: 'bg-white hover:bg-[#f5f5f5] text-[#25311f]',
-  };
-  return (
-    <Link href={href} className={`${base} ${styles[variant]} ${className}`}>
-      {children}
-    </Link>
-  );
+function monthYear(value) {
+    return new Date(value).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-function Card({ title, children, className = '' }) {
-  return (
-    <div className={`rounded-2xl border border-black/10 overflow-hidden bg-white shadow-sm ${className}`}>
-      <div className="bg-[#A9D9D9] px-6 py-3">
-        <h2 className="font-display font-semibold">{title}</h2>
-      </div>
-      <div className="p-6">{children}</div>
-    </div>
-  );
+function Stars({ value, size = 'text-xl' }) {
+    const filled = Math.max(0, Math.min(5, Math.round(value)));
+    return (
+        <span className={size + ' leading-none'} aria-hidden="true">
+            <span className="text-[#F5B800]">{'\u2605'.repeat(filled)}</span>
+            <span className="text-gray-300">{'\u2605'.repeat(5 - filled)}</span>
+        </span>
+    );
 }
 
-const EXPERIENCE_ICONS = {
-  education: (
-    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M12 3 2 8l10 5 10-5-10-5Z" strokeLinejoin="round" />
-      <path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5" />
-    </svg>
-  ),
-  work: (
-    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="7" width="18" height="13" rx="2" />
-      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
-  ),
-  certification: (
-    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="8" r="5" />
-      <path d="M8.5 12.5 7 21l5-2.5L17 21l-1.5-8.5" />
-    </svg>
-  ),
-  award: (
-    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="9" r="5" />
-      <path d="m8.5 13.5-1.5 7 5-2.5 5 2.5-1.5-7" />
-    </svg>
-  ),
-};
+function Panel({ title, subtitle, children }) {
+    return (
+        <section className="overflow-hidden rounded-3xl border-[1.5px] border-black bg-white">
+            <div className="border-b border-black bg-[#B3DFDF] px-6 py-4">
+                <h2 className="text-2xl" style={FONT_HEAD}>{title}</h2>
+                {subtitle && <p className="text-gray-700">{subtitle}</p>}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+function Pill({ href, children, solid }) {
+    return (
+        <Link href={href} className={'inline-flex items-center rounded-xl border-[1.5px] border-black px-5 py-2 text-lg hover:opacity-80 ' + (solid ? 'bg-[#B3DFDF]' : 'bg-white')}>
+            {children}
+        </Link>
+    );
+}
 
 export default function TutorProfile({ tutor }) {
-  if (!tutor) {
+    const user = usePage().props.auth && usePage().props.auth.user;
+    const isParent = Boolean(user && user.role === 'parent');
+    const first = (tutor.name || '').split(' ')[0];
+    const subjects = tutor.subjects || [];
+    const reviews = tutor.reviews || [];
+    const portfolio = tutor.portfolio || [];
+    const experience = tutor.experience || [];
+    const initials = (tutor.name || '?').split(' ').map((p) => p.charAt(0)).slice(0, 2).join('').toUpperCase();
+
     return (
-      <>
-        <Head title="Tutor not found — Happy Kid Arts and Tutorials" />
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 font-body">
-          <p className="text-lg">We couldn't find that tutor.</p>
-          <PillButton href="/tutors" variant="solid">Back to tutors</PillButton>
-        </div>
-      </>
-    );
-  }
+        <div className="min-h-screen bg-white px-4 py-8 sm:px-8" style={{ fontFamily: "'Lora', Georgia, serif" }}>
+            <Head title={tutor.name + ' - Happy Kid Arts and Tutorials'} />
+            <div className="mx-auto max-w-6xl space-y-6">
+                <Link href={isParent ? '/parent/book' : '/tutors'} className="inline-flex items-center gap-2 rounded-xl border-[1.5px] border-black bg-[#EAF1D1] px-5 py-2 text-lg hover:opacity-80">
+                    &larr; {isParent ? 'Back to bookings' : 'Back to tutors'}
+                </Link>
 
-  const subjects = tutor.subjects ?? [];
-  const experience = tutor.experience ?? [];
-  const reviews = tutor.reviews ?? [];
-  const firstName = tutor.name?.split(' ')[0] ?? 'This tutor';
-
-  return (
-    <>
-      <Head title={`${tutor.name} — Happy Kid Arts and Tutorials`} />
-
-      <div className="font-body text-[#232323] bg-white min-h-screen">
-        {/* ---------- NAVBAR ---------- */}
-        <header className="sticky top-0 z-50 bg-[#A9D9D3] border-b border-black/10">
-          <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <Logo />
-              <span className="font-display font-semibold text-lg text-[#1c1c1c]">
-                Happy Kid Arts and Tutorials
-              </span>
-            </Link>
-            <div className="flex items-center gap-3">
-              <PillButton href="/login" variant="outline">Log in</PillButton>
-              <PillButton href="/register" variant="solid">Sign up</PillButton>
-            </div>
-          </div>
-        </header>
-
-        <div className="mx-auto max-w-6xl px-6 py-8">
-          <Link
-            href="/tutors"
-            className="inline-flex items-center gap-1.5 rounded-full border border-black/70 bg-white px-4 py-1.5 text-sm font-medium hover:bg-[#f5f5f5] transition-colors"
-          >
-            <span aria-hidden="true">&larr;</span> Back to tutors
-          </Link>
-
-          {/* ---------- PROFILE HEADER ---------- */}
-          <div className="mt-6 rounded-2xl bg-[#E4EDCE] p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
-            <img
-              src={tutor.photo}
-              alt={tutor.name}
-              className="w-28 h-28 rounded-xl object-cover border border-black/20 flex-shrink-0"
-            />
-            <div className="flex-1">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h1 className="font-display font-semibold text-2xl">{tutor.name}</h1>
-                  <p className="text-[#4b4b4b] mt-1">{tutor.credential}</p>
-                </div>
-                <PillButton href="/parent/book" variant="solid" className="whitespace-nowrap">
-                  Book a session
-                </PillButton>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {subjects.map((s) => (
-                  <span
-                    key={s}
-                    className="text-xs font-medium bg-white border border-black/10 rounded-full px-3 py-1"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ---------- CONTENT GRID ---------- */}
-          <div className="mt-8 grid md:grid-cols-2 gap-6 items-start">
-            <Card title="About">
-              <p className="text-[#333] leading-relaxed">{tutor.bio}</p>
-            </Card>
-
-            <Card title="Availability">
-              <p className="text-[#333] leading-relaxed">
-                This tutor hasn't set up a public schedule yet. Start a booking to ask about
-                current openings and choose an available session time.
-              </p>
-            </Card>
-
-            <Card title="Certifications & Experience" className="md:col-span-2">
-              {experience.length === 0 ? (
-                <p className="text-[#555]">No certifications or experience listed yet.</p>
-              ) : (
-                <ul className="space-y-5">
-                  {experience.map((item, i) => (
-                    <li key={i} className="flex gap-3">
-                      <span className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-[#A9D9D9]/50 flex items-center justify-center text-[#20261d]">
-                        {EXPERIENCE_ICONS[item.type] ?? EXPERIENCE_ICONS.work}
-                      </span>
-                      <div>
-                        <p className="font-semibold">{item.title}</p>
-                        {item.subtitle && <p className="text-sm text-[#555]">{item.subtitle}</p>}
-                        {item.detail && <p className="text-sm text-[#444] mt-1">{item.detail}</p>}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-
-            <Card title="Reviews" className="md:col-span-2">
-              {reviews.length === 0 ? (
-                <p className="text-[#555]">No reviews yet.</p>
-              ) : (
-                <div className="space-y-5">
-                  <p className="font-semibold">Average rating: {Number(tutor.average_rating || 0).toFixed(2)} / 5</p>
-                  {reviews.map((review, index) => (
-                    <div key={`${review.created_at}-${index}`} className="border-t border-black/10 pt-4">
-                      <p className="text-[#c08b19]">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
-                      {review.comment && <p className="mt-1 text-[#333]">{review.comment}</p>}
-                      <p className="mt-1 text-sm text-[#555]">{review.reviewer || 'Parent'}</p>
+                <section className="overflow-hidden rounded-3xl border-[1.5px] border-black bg-white shadow-lg">
+                    <div className="h-24 bg-[#EAF1D1]" />
+                    <div className="px-6 pb-6">
+                        <div className="-mt-14 flex flex-wrap items-end gap-5">
+                            {tutor.photo ? (
+                                <img src={tutor.photo} alt={tutor.name} className="h-36 w-36 rounded-xl border-2 border-black object-cover" />
+                            ) : (
+                                <div className="flex h-36 w-36 items-center justify-center rounded-xl border-2 border-black bg-[#006B6B] text-4xl font-bold text-white">{initials}</div>
+                            )}
+                            <div className="min-w-0 flex-1 pb-1">
+                                <h1 className="text-3xl font-bold" style={FONT_HEAD}>{tutor.name}</h1>
+                                {tutor.credential && <p className="text-lg text-gray-700">{tutor.credential}</p>}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 pb-1">
+                                {tutor.review_count > 0 ? (
+                                    <span className="flex items-center gap-2"><Stars value={tutor.average_rating} />{Number(tutor.average_rating).toFixed(1)} ({tutor.review_count})</span>
+                                ) : (
+                                    <span className="text-gray-600">No reviews yet</span>
+                                )}
+                                {isParent && <Pill href="/messages">Message</Pill>}
+                                <Pill href={isParent ? '/parent/book' : '/login'} solid>Book with {first}</Pill>
+                            </div>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {subjects.map((s) => <span key={s} className="rounded-full bg-[#B3DFDF] px-4 py-1 text-lg">{s}</span>)}
+                        </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-        </div>
-      </div>
+                </section>
 
-      <style>{`
-        .font-display { font-family: 'Playfair Display', Georgia, serif; }
-        .font-body { font-family: 'Lora', Georgia, serif; }
-      `}</style>
-    </>
-  );
+                <div className="grid gap-6 lg:grid-cols-5">
+                    <div className="space-y-6 lg:col-span-3">
+                        <Panel title="About">
+                            <p className="whitespace-pre-line p-6 text-lg">{tutor.bio || 'This tutor has not added a bio yet.'}</p>
+                        </Panel>
+
+                        <Panel title="Portfolio">
+                            <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+                                {portfolio.length === 0 && <p className="text-gray-600 sm:col-span-2 lg:col-span-3">No portfolio images yet.</p>}
+                                {portfolio.map((item, i) => (
+                                    <figure key={item.path + i} className="overflow-hidden rounded-xl border border-black bg-white">
+                                        <img src={item.path} alt={item.title || 'Portfolio image'} className="h-32 w-full object-cover" />
+                                        <figcaption className="p-2 text-sm">
+                                            <span className="block font-semibold">{item.title || 'Untitled'}</span>
+                                            <span className="block text-xs text-gray-600">{item.tag}</span>
+                                        </figcaption>
+                                    </figure>
+                                ))}
+                            </div>
+                        </Panel>
+
+                        <Panel title="Certifications & Experiences">
+                            {experience.length === 0 ? (
+                                <p className="p-6 text-gray-600">No certifications or experience listed yet.</p>
+                            ) : (
+                                experience.map((item, i) => (
+                                    <div key={i} className="flex items-start gap-4 border-b border-black/40 px-6 py-4 last:border-b-0">
+                                        <span className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl ' + (item.type === 'work' ? 'bg-[#B3DFDF]' : 'bg-[#EAF1D1]')} aria-hidden="true">{item.type === 'work' ? '\u25A0' : '\u2605'}</span>
+                                        <div>
+                                            <div className="text-lg">{item.title}</div>
+                                            {item.subtitle && <div className="text-gray-600">{item.subtitle}</div>}
+                                            {item.detail && <div className="text-sm text-gray-600">{item.detail}</div>}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </Panel>
+                    </div>
+
+                    <div className="space-y-6 lg:col-span-2">
+                        <Panel title="Availability">
+                            <div className="bg-[#EAF1D1]">
+                                {DAYS.map(([key, label]) => {
+                                    const list = (tutor.availability && tutor.availability[key]) || [];
+                                    return (
+                                        <div key={key} className="flex flex-wrap items-center gap-3 border-b border-black/50 px-6 py-4 last:border-b-0">
+                                            <span className="w-14 text-lg">{label}</span>
+                                            {list.length === 0 && <span className="text-gray-600">No available slots</span>}
+                                            {list.map((t) => <span key={t} className="rounded-full bg-[#B3DFDF] px-3 py-1">{fmtTime(t)}</span>)}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </Panel>
+
+                        <Panel title="Reviews" subtitle={tutor.review_count + ' parent ' + (tutor.review_count === 1 ? 'review' : 'reviews')}>
+                            <div className="border-b border-black/40 bg-[#EAF1D1] px-6 py-4">
+                                {tutor.review_count > 0 ? (
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-4xl font-bold" style={FONT_HEAD}>{Number(tutor.average_rating).toFixed(1)}</span>
+                                        <div><Stars value={tutor.average_rating} /><div className="text-gray-700">Based on verified bookings</div></div>
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-700">No parent reviews yet.</p>
+                                )}
+                            </div>
+                            {reviews.map((r, i) => (
+                                <div key={i} className="border-b border-black/40 bg-[#EAF1D1] px-6 py-4 last:border-b-0">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-lg font-semibold" style={FONT_HEAD}>{r.reviewer || 'Parent'}</span>
+                                        <span className="text-sm text-gray-600">{monthYear(r.created_at)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2"><Stars value={r.rating} size="text-base" /><span className="text-sm">{r.rating}.0</span></div>
+                                    {r.comment && <p className="mt-1 text-gray-800">&ldquo;{r.comment}&rdquo;</p>}
+                                </div>
+                            ))}
+                        </Panel>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }

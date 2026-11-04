@@ -8,6 +8,8 @@ use Inertia\Response;
 
 class PublicTutorController extends Controller
 {
+    private const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
     public function index(): Response
     {
         $tutors = TutorProfile::with('user:id,name')
@@ -62,9 +64,35 @@ class PublicTutorController extends Controller
                 'categories' => $tutorProfile->categories ?? [],
                 'experience' => $tutorProfile->experience ?? [],
                 'years_experience' => $tutorProfile->years_experience,
+                'availability' => $this->week($tutorProfile->availability),
+                'portfolio' => $this->list($tutorProfile->portfolio),
                 'reviews' => $reviews,
+                'review_count' => $reviews->count(),
                 'average_rating' => round((float) $reviews->avg('rating'), 2),
             ],
         ]);
+    }
+
+    private function list($raw): array
+    {
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        $decoded = json_decode((string) $raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function week($raw): array
+    {
+        $data = $this->list($raw);
+        $week = [];
+
+        foreach (self::DAYS as $day) {
+            $week[$day] = array_values(array_filter((array) ($data[$day] ?? []), 'is_string'));
+        }
+
+        return $week;
     }
 }

@@ -52,11 +52,11 @@ test('a parent booking recalculates and persists the server-side rate', function
         validBookingData($student, $tutor),
     );
 
-    $response->assertSessionHasNoErrors()->assertRedirect(route('parent.dashboard', absolute: false));
+    $response->assertSessionHasNoErrors()->assertRedirect(route('parent.billing.index', absolute: false));
     $session = TutoringSession::firstOrFail();
 
-    expect((float) $session->rate_applied)->toBe(350.0);
-    expect((float) $session->payment->amount)->toBe(350.0);
+    expect((float) $session->rate_applied)->toBe(300.0);
+    expect((float) $session->payment->amount)->toBe(300.0);
     expect($session->payment->status)->toBe('pending');
 });
 
@@ -128,4 +128,98 @@ test('booking rejects dates before today and end times before start times', func
 
     $response->assertSessionHasErrors(['session_date', 'end_time']);
     expect(TutoringSession::count())->toBe(0);
+});
+
+
+test('home-based sessions use the 350 per hour minimum', function () {
+    $parent = User::factory()->create(['role' => 'parent']);
+    $student = createStudentForParent($parent);
+    $tutor = createBookableTutor();
+    $booking = validBookingData($student, $tutor);
+    $booking['subject'] = 'Reading';
+    $booking['location_type'] = 'home';
+
+    $this->actingAs($parent)->post(route('parent.booking.store'), $booking)->assertSessionHasNoErrors();
+
+    expect((float) TutoringSession::firstOrFail()->rate_applied)->toBe(350.0);
+});
+
+test('special teaching is a flat 500 per session', function () {
+    $parent = User::factory()->create(['role' => 'parent']);
+    $student = createStudentForParent($parent);
+    $tutor = createBookableTutor();
+    $booking = validBookingData($student, $tutor);
+    $booking['subject'] = 'Special Teaching';
+    $booking['end_time'] = '11:00';
+
+    $this->actingAs($parent)->post(route('parent.booking.store'), $booking)->assertSessionHasNoErrors();
+
+    expect((float) TutoringSession::firstOrFail()->rate_applied)->toBe(500.0);
+});
+
+test('booking is rejected when the child grade level cannot be read', function () {
+    $parent = User::factory()->create(['role' => 'parent']);
+    $student = StudentProfile::create([
+        'parent_id' => $parent->id,
+        'student_name' => 'No Grade',
+        'grade_level' => 'unknown',
+    ]);
+    $tutor = createBookableTutor();
+
+    $this->actingAs($parent)
+        ->post(route('parent.booking.store'), validBookingData($student, $tutor))
+        ->assertSessionHasErrors('student_profile_id');
+
+    expect(TutoringSession::count())->toBe(0);
+});
+
+test('the rate endpoint prices a booking from the stored profile', function () {
+    $parent = User::factory()->create(['role' => 'parent']);
+    $student = createStudentForParent($parent);
+
+    $this->actingAs($parent)
+        ->getJson(route('parent.booking.rate', [
+            'student_profile_id' => $student->id,
+            'subject' => 'Math',
+            'location_type' => 'onsite',
+            'start_time' => '09:00',
+            'end_time' => '10:30',
+        ]))
+        ->assertOk()
+        ->assertJson(['rate' => 450, 'kind' => 'academic']);
+});
+
+test('a tutor cannot be double booked for an overlapping time', function () {
+    $parent = User::factory()->create(['role' => 'parent']);
+    $student = createStudentForParent($parent);
+    $tutor = createBookableTutor();
+    $booking = validBookingData($student, $tutor);
+
+    $this->actingAs($parent)->post(route('parent.booking.store'), $booking)->assertSessionHasNoErrors();
+
+    $overlap = $booking;
+    $overlap['start_time'] = '09:30';
+    $overlap['end_time'] = '10:30';
+
+    $this->actingAs($parent)->post(route('parent.booking.store'), $overlap)->assertSessionHasErrors('tutor_id');
+
+    expect(TutoringSession::count())->toBe(1);
+});
+
+test('availability lists tutors that are busy at the requested time', function () {
+    $parent = User::factory()->create(['role' => 'parent']);
+    $student = createStudentForParent($parent);
+    $tutor = createBookableTutor();
+    $booking = validBookingData($student, $tutor);
+
+    $this->actingAs($parent)->post(route('parent.booking.store'), $booking)->assertSessionHasNoErrors();
+
+    $this->actingAs($parent)
+        ->getJson(route('parent.booking.availability', [
+            'session_date' => $booking['session_date'],
+            'start_time' => '09:30',
+            'end_time' => '10:30',
+        ]))
+        ->assertOk()
+        ->assertJson(['unavailable' => [$tutor->id]]);
 });

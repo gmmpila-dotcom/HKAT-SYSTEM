@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\StudentProfile;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
@@ -18,9 +20,16 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
+        $childName = $user->role === 'parent'
+            ? StudentProfile::where('parent_id', $user->id)->orderBy('id')->value('student_name')
+            : null;
+
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
+            'childName' => $childName,
         ]);
     }
 
@@ -29,13 +38,29 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $validated = $request->validated();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $user->fill(Arr::only($validated, ['name', 'email']));
+
+        if ($request->has('phone')) {
+            $user->phone = $validated['phone'] ?? null;
         }
 
-        $request->user()->save();
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
+        if ($user->role === 'parent' && ! empty($validated['child_name'])) {
+            $student = StudentProfile::where('parent_id', $user->id)->orderBy('id')->first();
+
+            if ($student) {
+                $student->student_name = $validated['child_name'];
+                $student->save();
+            }
+        }
 
         return Redirect::route('profile.edit');
     }
