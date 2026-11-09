@@ -22,7 +22,7 @@ class RateCalculatorTest extends TestCase
     {
         $this->assertSame(350.0, RateCalculator::hourly('Grade 3', 'Reading', 'home'));
         $this->assertSame(400.0, RateCalculator::hourly('Grade 10', 'Math', 'home'));
-        $this->assertSame(250.0, RateCalculator::hourly('Grade 3', 'Math', 'online'));
+        $this->assertSame(150.0, RateCalculator::hourly('Grade 3', 'Math', 'online'));
     }
 
     public function test_total_multiplies_the_hourly_rate_by_hours(): void

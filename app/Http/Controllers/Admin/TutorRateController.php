@@ -42,6 +42,11 @@ class TutorRateController extends Controller
             }
         }
 
+        $existing = \App\Support\RateCalculator::overrides($user->id);
+        foreach (['online_only', 'program'] as $keep) {
+            if (isset($existing[$keep])) { $rates[$keep] = $existing[$keep]; }
+        }
+
         if ($rates['bands'] === []) {
             unset($rates['bands']);
         }

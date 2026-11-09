@@ -52,11 +52,11 @@ class BookingController extends Controller
                     'profile_id' => $profile->id,
                     'name' => $profile->user->name,
                     'photo' => $profile->photo_path,
-                    'credential' => $profile->credential,
                     'subjects' => $profile->specializations ?? [],
                     'categories' => $profile->categories ?? [],
                     'rating' => $rating ? round((float) $rating->average, 1) : null,
                     'review_count' => $rating ? (int) $rating->total : 0,
+                    'rates' => RateCalculator::overrides($profile->user_id),
                 ];
             })
             ->values();
@@ -66,6 +66,7 @@ class BookingController extends Controller
             'students' => StudentProfile::where('parent_id', $user->id)
                 ->get(['id', 'student_name', 'grade_level']),
             'onlinePaymentsEnabled' => ! empty(config('services.paymongo.secret_key')),
+            'standardRates' => config('rates'),
         ]);
     }
 
@@ -80,7 +81,7 @@ class BookingController extends Controller
         $validated = $request->validate([
             'student_profile_id' => ['required', 'exists:student_profiles,id'],
             'subject' => ['required', 'string', 'max:255'],
-            'location_type' => ['required', 'in:onsite,home'],
+            'location_type' => ['required', 'in:onsite,home,online'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
         ]);
@@ -268,7 +269,7 @@ class BookingController extends Controller
             'tutor_id' => ['required', 'exists:users,id'],
             'subject' => ['required', 'string', 'max:255'],
             'session_type' => ['required', 'in:1on1,class'],
-            'location_type' => ['required', 'in:onsite,home'],
+            'location_type' => ['required', 'in:onsite,home,online'],
             'session_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
@@ -309,6 +310,16 @@ class BookingController extends Controller
             $validated['start_time'],
             $validated['end_time'],
         );
+
+        $tutorRates = \App\Support\RateCalculator::overrides((int) $validated['tutor_id']);
+        if (! empty($tutorRates['online_only']) && $validated['location_type'] !== 'online') {
+            throw \Illuminate\Validation\ValidationException::withMessages(['location_type' => 'This tutor teaches online only.']);
+        }
+
+        $taught = array_map(fn ($s) => strtolower(trim((string) $s)), \App\Models\TutorProfile::where('user_id', $validated['tutor_id'])->value('specializations') ?? []);
+        if (! in_array(strtolower(trim($validated['subject'])), $taught, true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['tutor_id' => 'This tutor does not teach that subject.']);
+        }
 
         DB::transaction(function () use ($student, $validated, $rateApplied) {
             $session = TutoringSession::create([

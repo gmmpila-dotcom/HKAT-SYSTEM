@@ -89,6 +89,10 @@ class RateCalculator
     {
         $band = self::band($gradeLevel);
         $key = self::isCoreSubject($subject) ? 'core' : 'regular';
+
+        if ($location === 'online') {
+            return (float) config('rates.online_per_hour', 150);
+        }
         $custom = self::overrides($tutorId);
 
         $own = $custom['bands'][$band['min']][$key] ?? null;
@@ -105,6 +109,15 @@ class RateCalculator
     /** Total price of one session. There is no class discount and no service fee. */
     public static function total(string $gradeLevel, string $subject, string $location, float $hours, ?int $tutorId = null): float
     {
+        foreach ((self::overrides($tutorId)['program'] ?? []) as $programName => $program) {
+            if (strtolower(trim((string) $programName)) === strtolower(trim($subject))) {
+                return (float) $program['price'];
+            }
+        }
+        if ($location === 'online' && self::kind($subject) !== 'academic') {
+            throw new InvalidArgumentException('Online sessions are for academic subjects only.');
+        }
+
         $kind = self::kind($subject);
 
         if ($kind === 'special') {

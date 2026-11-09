@@ -1,3 +1,4 @@
+import JoinButton from '@/Components/JoinButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { formatDate } from '@/utils/formatDate';
@@ -68,7 +69,7 @@ export default function Dashboard({ sessions = [] }) {
                                     {formatDate(session.session_date)}{DOT}{fmtTime(session.start_time)}{DASH}{fmtTime(session.end_time)}
                                 </div>
                                 <div className="text-sm text-gray-600">
-                                    {session.session_type === 'class' ? 'Class' : '1-on-1'}{DOT}{LOCATION[session.location_type] || session.location_type}
+                                    {session.session_type === 'class' ? 'Class' : '1-on-1'}{DOT}{LOCATION[session.location_type] || session.location_type} <JoinButton session={session} />
                                 </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">

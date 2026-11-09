@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\TutorProfile;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -10,32 +12,37 @@ class PublicTutorController extends Controller
 {
     private const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-    public function index(): Response
+    public function index(Request $request): RedirectResponse
     {
-        $tutors = TutorProfile::with('user:id,name')
-            ->where('is_verified', true)
-            ->whereHas('user', function ($query) {
-                $query->where('role', 'tutor');
-            })
-            ->get()
-            ->map(function ($profile) {
-                return [
-                    'id' => $profile->id,
-                    'name' => $profile->user->name,
-                    'photo' => $profile->photo_path,
-                    'credential' => $profile->credential,
-                    'subjects' => $profile->specializations ?? [],
-                    'categories' => $profile->categories ?? [],
-                ];
-            });
+        $user = $request->user();
 
-        return Inertia::render('Tutors', [
-            'tutors' => $tutors,
-        ]);
+        if (! $user) {
+            return redirect()->guest(route('login'));
+        }
+
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.tutors.index');
+        }
+
+        if ($user->role === 'tutor') {
+            return redirect()->route('tutor.dashboard');
+        }
+
+        return redirect('/parent/book');
     }
 
-    public function show(TutorProfile $tutorProfile): Response
+    public function show(Request $request, TutorProfile $tutorProfile): Response|RedirectResponse
     {
+        $user = $request->user();
+
+        if (! $user) {
+            return redirect()->guest(route('login'));
+        }
+
+        if (! in_array($user->role, ['parent', 'admin'], true)) {
+            abort(403);
+        }
+
         $tutorProfile->load('user:id,name,role');
 
         if (! $tutorProfile->is_verified || $tutorProfile->user?->role !== 'tutor') {
@@ -58,12 +65,9 @@ class PublicTutorController extends Controller
                 'id' => $tutorProfile->id,
                 'name' => $tutorProfile->user->name,
                 'photo' => $tutorProfile->photo_path,
-                'credential' => $tutorProfile->credential,
                 'bio' => $tutorProfile->bio,
                 'subjects' => $tutorProfile->specializations ?? [],
                 'categories' => $tutorProfile->categories ?? [],
-                'experience' => $tutorProfile->experience ?? [],
-                'years_experience' => $tutorProfile->years_experience,
                 'availability' => $this->week($tutorProfile->availability),
                 'portfolio' => $this->list($tutorProfile->portfolio),
                 'reviews' => $reviews,

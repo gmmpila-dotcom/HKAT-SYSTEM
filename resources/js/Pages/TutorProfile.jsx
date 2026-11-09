@@ -73,7 +73,7 @@ export default function TutorProfile({ tutor }) {
                             )}
                             <div className="min-w-0 flex-1 pb-1">
                                 <h1 className="text-3xl font-bold" style={FONT_HEAD}>{tutor.name}</h1>
-                                {tutor.credential && <p className="text-lg text-gray-700">{tutor.credential}</p>}
+                                <p className="text-lg text-gray-700">Verified tutor</p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 pb-1">
                                 {tutor.review_count > 0 ? (
@@ -110,23 +110,6 @@ export default function TutorProfile({ tutor }) {
                                     </figure>
                                 ))}
                             </div>
-                        </Panel>
-
-                        <Panel title="Certifications & Experiences">
-                            {experience.length === 0 ? (
-                                <p className="p-6 text-gray-600">No certifications or experience listed yet.</p>
-                            ) : (
-                                experience.map((item, i) => (
-                                    <div key={i} className="flex items-start gap-4 border-b border-black/40 px-6 py-4 last:border-b-0">
-                                        <span className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl ' + (item.type === 'work' ? 'bg-[#B3DFDF]' : 'bg-[#EAF1D1]')} aria-hidden="true">{item.type === 'work' ? '\u25A0' : '\u2605'}</span>
-                                        <div>
-                                            <div className="text-lg">{item.title}</div>
-                                            {item.subtitle && <div className="text-gray-600">{item.subtitle}</div>}
-                                            {item.detail && <div className="text-sm text-gray-600">{item.detail}</div>}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
                         </Panel>
                     </div>
 

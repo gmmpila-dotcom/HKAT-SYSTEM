@@ -14,7 +14,7 @@ test('the public tutor profile shows availability, portfolio and review count', 
         'portfolio' => json_encode([['path' => '/images/portfolio/x.jpg', 'title' => 'Mural', 'tag' => 'Art']]),
     ]);
 
-    $this->get(route('tutors.show', $profile))
+    $this->actingAs(User::factory()->create(['role' => 'parent']))->get(route('tutors.show', $profile))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('TutorProfile')
@@ -27,7 +27,7 @@ test('an unverified tutor profile is not public', function () {
     $tutor = User::factory()->create(['role' => 'tutor']);
     $profile = TutorProfile::create(['user_id' => $tutor->id, 'is_verified' => false]);
 
-    $this->get(route('tutors.show', $profile))->assertNotFound();
+    $this->actingAs(User::factory()->create(['role' => 'parent']))->get(route('tutors.show', $profile))->assertNotFound();
 });
 
 test('a parent sees artwork from their child tutors only', function () {

@@ -1,3 +1,4 @@
+import JoinButton from '@/Components/JoinButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -129,21 +130,7 @@ function SessionRow({ session, onDetails }) {
 
             <div className="flex items-center gap-2">
                 <span className="rounded-full border-[1.5px] border-black bg-white px-4 py-1 text-sm">{label}</span>
-                {online && session.meeting_url && (
-                    <a
-                        href={session.meeting_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-full border-[1.5px] border-black bg-[#EAF1D1] px-4 py-1 text-sm hover:opacity-80"
-                    >
-                        Join
-                    </a>
-                )}
-                {online && !session.meeting_url && (
-                    <span title="Link pending" className="cursor-not-allowed rounded-full border-[1.5px] border-black bg-gray-300 px-4 py-1 text-sm text-gray-600">
-                        Join
-                    </span>
-                )}
+                <JoinButton session={session} />
                 <button
                     type="button"
                     onClick={() => onDetails(session)}
@@ -365,7 +352,7 @@ export default function Dashboard({ sessions = [], students = [], flashStatus })
                     </div>
 
                     <div className="space-y-6">
-                        <Card title="Rate Card" subtitle="Applied automatically when a session is booked">
+                        <Card title="Rate Card" subtitle="Rates may vary by tutor. The exact price is shown when you choose a tutor.">
                             <div className="text-sm">
                                 <div className="grid grid-cols-3 gap-2 bg-[#EAF1D1] px-6 py-2">
                                     <span>Grade level</span>

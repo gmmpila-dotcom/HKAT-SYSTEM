@@ -1,3 +1,4 @@
+import JoinButton from '@/Components/JoinButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -89,7 +90,7 @@ function TodayRow({ session }) {
             <span className="h-14 w-1 shrink-0 rounded-full" style={{ backgroundColor: tutorColor(session.tutor_id) }} />
             <div className="min-w-0 flex-1">
                 <div className="text-lg font-semibold">{student.student_name || '-'}</div>
-                <div className="truncate text-gray-800">{session.subject}{DOT}{tutor.name || 'Tutor'}</div>
+                <div className="truncate text-gray-800">{session.subject}{DOT}{tutor.name || 'Tutor'} <span className="ml-2"><JoinButton session={session} /></span></div>
             </div>
             <span className="rounded-full bg-[#B3DFDF] px-4 py-1 text-sm">{STATUS_LABEL[session.status] || session.status}</span>
         </div>

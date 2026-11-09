@@ -12,7 +12,7 @@ const KINDS = [
     { key: 'special', label: 'Special Teaching', hint: 'For children with special needs', category: 'special' },
 ];
 
-const ACADEMIC_SUBJECTS = ['Reading', 'Writing', 'Math', 'English', 'Science', 'Filipino', 'MAPEH', 'AP'];
+const ACADEMIC_SUBJECTS = ['Reading', 'Writing', 'Math', 'English', 'Science', 'Filipino', 'MAPEH', 'AP', 'Mandarin Chinese', 'Hokkien'];
 const ART_SUBJECTS = ['Drawing', 'Painting'];
 
 const LENGTHS = [
@@ -108,7 +108,7 @@ function TutorCard({ tutor, selected, unavailable, onSelect }) {
                 )}
                 <div className="min-w-0">
                     <div className="text-xl leading-snug" style={FONT_HEAD}>{tutor.name}</div>
-                    {tutor.credential && <div className="text-sm text-gray-700">{tutor.credential}</div>}
+                    {tutor.credential && <div className="text-sm text-gray-700">Verified tutor</div>}
                     <div className="mt-1 text-sm">
                         {tutor.rating ? '\u2605 ' + tutor.rating + ' (' + tutor.review_count + ')' : 'No reviews yet'}
                     </div>
@@ -144,7 +144,7 @@ function TutorCard({ tutor, selected, unavailable, onSelect }) {
         </div>
     );
 }
-export default function Book({ tutors = [], students = [], onlinePaymentsEnabled = false }) {
+export default function Book({ tutors = [], students = [], onlinePaymentsEnabled = false, standardRates = null }) {
     const [kind, setKind] = useState('academic');
     const [length, setLength] = useState('1');
     const [fee, setFee] = useState(null);
@@ -163,12 +163,14 @@ export default function Book({ tutors = [], students = [], onlinePaymentsEnabled
 
     const kindDef = KINDS.find((item) => item.key === kind);
     const student = students.find((item) => String(item.id) === String(data.student_profile_id)) || null;
-    const endTime = addHours(data.start_time, Number(length));
+    const lilyOnly = Boolean((tutors.find((x) => String(x.id) === String(data.tutor_id)) || {}).rates?.online_only);
+    const endTime = addHours(data.start_time, lilyOnly ? 10 : Number(length));
     const subjectChoices = kind === 'art' ? ART_SUBJECTS : ACADEMIC_SUBJECTS;
     const subjectKey = (data.subject || '').toLowerCase();
 
     const eligible = tutors
         .filter((tutor) => (tutor.categories || []).includes(kindDef.category))
+        .filter((tutor) => subjectKey.trim() === '' || (tutor.subjects || []).some((s) => String(s).trim().toLowerCase() === subjectKey.trim()))
         .map((tutor) => ({
             ...tutor,
             match: subjectKey !== '' && (tutor.subjects || []).some((subject) => {
@@ -178,8 +180,15 @@ export default function Book({ tutors = [], students = [], onlinePaymentsEnabled
         }))
         .sort((a, b) => Number(b.match) - Number(a.match));
 
-    const selectedTutor = tutors.find((tutor) => String(tutor.id) === String(data.tutor_id)) || null;
-    const ready = Boolean(data.student_profile_id && data.subject && data.tutor_id && data.session_date && data.start_time) && !busy.includes(Number(data.tutor_id));
+    const offIds = eligible.filter((tutor) => !(tutor.subjects || []).some((s) => String(s).trim().toLowerCase() === subjectKey.trim())).map((tutor) => Number(tutor.id));
+    const selectedTutor = eligible.find((tutor) => String(tutor.id) === String(data.tutor_id)) || null;
+    const progRates = selectedTutor && selectedTutor.rates && selectedTutor.rates.program ? selectedTutor.rates.program : null;
+    const onlyOnline = Boolean(selectedTutor && selectedTutor.rates && selectedTutor.rates.online_only);
+    const progPick = progRates ? (progRates[data.subject] || Object.values(progRates)[0]) : null;
+    useEffect(() => {
+        if (onlyOnline && data.location_type !== 'online') setData('location_type', 'online');
+    }, [onlyOnline]);
+    const ready = Boolean(data.student_profile_id && data.subject && data.tutor_id && data.session_date && data.start_time) && !busy.includes(Number(data.tutor_id)) && !(subjectKey !== '' && offIds.includes(Number(data.tutor_id)));
 
     const feeNote = kind === 'art'
         ? 'Flat price per session (about 2 hours), per child.'
@@ -348,7 +357,8 @@ export default function Book({ tutors = [], students = [], onlinePaymentsEnabled
 
                         <label className="block">
                             <Label>Session length</Label>
-                            <select className={FIELD} value={length} onChange={(e) => setLength(e.target.value)}>
+                            {lilyOnly && <div className={FIELD}>10 hours (full program)</div>}
+                        <select className={FIELD + (lilyOnly ? ' hidden' : '')} value={length} onChange={(e) => setLength(e.target.value)}>
                                 {LENGTHS.map((item) => (
                                     <option key={item.value} value={item.value}>{item.label}</option>
                                 ))}
@@ -376,11 +386,12 @@ export default function Book({ tutors = [], students = [], onlinePaymentsEnabled
 
                     <div className="mt-6">
                         <Label>Session location</Label>
-                        <div className="mt-1 grid gap-4 md:grid-cols-2">
+                        <div className={'grid gap-3 ' + (kind === 'academic' ? 'sm:grid-cols-3' : 'sm:grid-cols-2') + (onlyOnline ? ' sm:!grid-cols-1' : '')}>
                             {[
                                 { key: 'onsite', title: 'On-site', text: 'At the Happy Kids Art Studio, Gentri' },
                                 { key: 'home', title: 'Home based', text: 'Tutor travels to you - min ' + PESO + '350/hr + fare' },
-                            ].map((option) => (
+        ...(kind === 'academic' ? [{ key: 'online', title: 'Online class', text: PESO + '150/hr' }] : []),
+                            ].filter((option) => !onlyOnline || option.key === 'online').map((option) => (onlyOnline && progPick ? { ...option, text: PESO + Number(progPick.price).toLocaleString('en-PH') + ' per ' + progPick.hours + '-hour program' } : option)).map((option) => (
                                 <button
                                     key={option.key}
                                     type="button"
@@ -417,7 +428,7 @@ export default function Book({ tutors = [], students = [], onlinePaymentsEnabled
 
                 <Section number="4" title="Choose a tutor">
                     {eligible.length === 0 ? (
-                        <p className="text-gray-800">No tutors are available for this type of session yet.</p>
+                        <p className="text-gray-800">No tutor teaches this subject yet.</p>
                     ) : (
                         <div className="flex gap-4 overflow-x-auto pb-2">
                             {eligible.map((tutor) => (
@@ -447,6 +458,48 @@ export default function Book({ tutors = [], students = [], onlinePaymentsEnabled
                     </div>
 
                     {feeNote && <p className="mt-3 text-sm text-gray-800">{feeNote}</p>}
+                {selectedTutor && standardRates && (() => {
+                    const taught = (selectedTutor.subjects || []).map((s) => String(s).toLowerCase());
+                    const teaches = (word) => taught.some((s) => s.includes(word));
+                    const academic = taught.some((s) => !/draw|paint|mural|special|art/.test(s));
+                    const custom = selectedTutor.rates || {};
+                    if (custom.program) {
+                        return (
+                            <div className="mt-4 rounded-2xl border border-black bg-[#EAF1D1] p-4 text-sm">
+                                <div className="mb-2 text-lg font-semibold">Rates for {selectedTutor.name}</div>
+                                {Object.entries(custom.program).map(([name, p]) => (
+                                    <div key={name} className="flex justify-between border-t border-black/30 py-1">
+                                        <span>{name}</span>
+                                        <span>{'\u20B1'}{Number(p.price).toLocaleString('en-PH')} per {p.hours}-hour program &middot; Online</span>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    }
+                    const std = standardRates;
+                    const peso = '\u20B1';
+                    const row = (band, key) => {
+                        const own = custom.bands && custom.bands[band.min] ? custom.bands[band.min][key] : undefined;
+                        return own !== undefined && own !== null ? own : band[key];
+                    };
+                    const special = custom.special !== undefined && custom.special !== null ? custom.special : std.special_teaching_per_session;
+                    const home = custom.home !== undefined && custom.home !== null ? custom.home : std.home_minimum_per_hour;
+                    return (
+                        <div className="mt-4 rounded-2xl border border-black bg-[#EAF1D1] p-4 text-sm">
+                            <div className="mb-2 text-lg font-semibold">Rates for {selectedTutor.name}</div>
+                            {academic && std.bands.map((band) => (
+                                <div key={band.min} className="flex justify-between border-t border-black/30 py-1">
+                                    <span>Grades {band.min}&ndash;{band.max}</span>
+                                    <span>{peso}{row(band, 'regular')}/hr &middot; Math / Sci / Eng {peso}{row(band, 'core')}/hr</span>
+                                </div>
+                            ))}
+                            {teaches('special') && <div className="flex justify-between border-t border-black/30 py-1"><span>Special Teaching</span><span>{peso}{special}/session</span></div>}
+                            {teaches('draw') && <div className="flex justify-between border-t border-black/30 py-1"><span>Drawing</span><span>{peso}{std.arts.drawing}/session</span></div>}
+                            {teaches('paint') && <div className="flex justify-between border-t border-black/30 py-1"><span>Painting</span><span>{peso}{std.arts.painting}/session</span></div>}
+                            {academic && <div className="flex justify-between border-t border-black/30 py-1"><span>Home-based</span><span>min {peso}{home}/hr + fare</span></div>}
+                        </div>
+                    );
+                })()}
 
                     <p className="mt-6 text-lg">Payment is required to confirm the session. Tutoring starts once payment clears.</p>
 

@@ -7,8 +7,8 @@ const FONT_HEAD = { fontFamily: "'Playfair Display', Georgia, serif" };
 const PESO = '\u20B1';
 const DOT = ' \u00B7 ';
 const MASK = '\u2022\u2022\u2022\u2022';
-const NAMES = { gcash: 'GCash', bpi: 'BPI Bank Transfer' };
-const BRAND = { gcash: '#2563C9', bpi: '#9E1B1B' };
+const NAMES = { gcash: 'GCash', bpi: 'BPI Bank Transfer', cash: 'Cash' };
+const BRAND = { gcash: '#2563C9', bpi: '#9E1B1B', cash: '#2F7D32' };
 const STATUS_STYLES = { pending: 'bg-[#FBE7A6]', paid: 'bg-[#B8F2C0]', failed: 'bg-[#F2B3B3]' };
 const FIELD = 'mt-1 block w-full rounded-2xl border-[1.5px] border-black bg-white px-4 py-3 focus:border-black focus:ring-0';
 
@@ -34,7 +34,9 @@ function typeLabel(type) {
 }
 
 function methodText(method) {
-    return method ? NAMES[method.type] + ' ' + MASK + ' ' + method.last4 : '';
+    if (!method) return '';
+    if (method.type === 'cash') return 'Cash (paid to the owner or tutor)';
+    return NAMES[method.type] + ' ' + MASK + ' ' + method.last4;
 }
 
 function serviceText(payment) {
@@ -155,7 +157,7 @@ function MethodModal({ current, onClose }) {
     const Option = ({ value, title, sub }) => (
         <label className={'flex cursor-pointer items-center gap-3 rounded-2xl border border-black/60 px-4 py-3 ' + (type === value ? 'bg-[#D6EEF0]' : '')}>
             <input type="radio" name="type" checked={type === value} onChange={() => setType(value)} />
-            <span className="font-bold" style={{ color: BRAND[value] }}>{value === 'gcash' ? 'G' : 'BPI'}</span>
+            <span className="font-bold" style={{ color: BRAND[value] }}>{value === 'gcash' ? 'G' : value === 'cash' ? '\u20B1' : 'BPI'}</span>
             <span><span className="block text-lg">{title}</span><span className="block text-sm text-gray-600">{sub}</span></span>
         </label>
     );
@@ -177,7 +179,9 @@ function MethodModal({ current, onClose }) {
                 <div className="mt-2 space-y-2">
                     <Option value="gcash" title="GCash" sub="Mobile wallet - fast and secure" />
                     <Option value="bpi" title="Bank Transfer (BPI)" sub="Pay from your BPI account" />
+                    <Option value="cash" title="Cash" sub="Pay the owner or tutor in person" />
                 </div>
+                {type !== 'cash' && (<div>
                 <label className="mt-4 block text-lg">{type === 'gcash' ? 'GCash Number' : 'Account Number'}
                     <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder={type === 'gcash' ? '09XX XXX XXXX' : 'Account number'} className={FIELD} />
                 </label>
@@ -186,6 +190,8 @@ function MethodModal({ current, onClose }) {
                     <input value={name} onChange={(e) => setName(e.target.value)} className={FIELD} />
                 </label>
                 {errors.name && <p className="mt-1 text-sm text-red-700">{errors.name}</p>}
+                </div>)}
+                {type === 'cash' && <p className="mt-3 text-sm text-gray-700">You will hand the cash to the owner or your tutor. The admin marks the payment as received, and then your session can be confirmed.</p>}
                 <p className="mt-3 text-sm text-gray-600">Only the last 4 digits are kept. The full number is never stored.</p>
                 <Buttons
                     left={<button type="button" onClick={onClose} className={GHOST}>Cancel</button>}
@@ -295,6 +301,47 @@ function SuccessModal({ payment, onDone }) {
     );
 }
 
+function CashModal({ payment, onClose, onChange }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const requested = String(payment.method_label || '').startsWith('Cash');
+    const fee = baseFee(payment);
+    const tip = Number(payment.tip_amount || 0);
+
+    const send = () => {
+        setBusy(true);
+        router.post(route('parent.payments.cash-request', payment.id), {}, {
+            preserveScroll: true,
+            onSuccess: onClose,
+            onError: (e) => setError(e.payment || 'Could not send the request.'),
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    return (
+        <Shell onClose={onClose}>
+            <div className="p-6">
+                <h3 className="text-2xl font-bold" style={FONT_HEAD}>Pay with Cash</h3>
+                <p className="text-gray-700">Hand the cash to the owner or your tutor</p>
+                <div className="mt-4 flex items-center justify-between rounded-2xl border border-black/60 p-4">
+                    <div className="text-lg">Cash payment</div>
+                    <button type="button" onClick={onChange} className="text-[#006B6B] underline">Change</button>
+                </div>
+                <div className="mt-4"><SummaryRows fee={fee} tip={tip} total={Number(payment.amount)} /></div>
+                <p className="mt-4 rounded-2xl bg-[#D6EEF0] p-3 text-[#064E50]">
+                    {requested
+                        ? 'Your request was sent. The admin will confirm your session once the cash is received.'
+                        : 'Press Request cash payment to tell the admin. Your session is confirmed after the admin records the cash.'}
+                </p>
+                {error && <p className="mt-2 text-red-700">{error}</p>}
+                <Buttons
+                    left={<button type="button" onClick={onClose} className={GHOST}>Close</button>}
+                    right={<button type="button" disabled={busy || requested} onClick={send} className={SOLID}>{requested ? 'Requested' : busy ? 'Sending...' : 'Request cash payment'}</button>}
+                />
+            </div>
+        </Shell>
+    );
+}
 function BreakdownCard({ payment, onTip, onPay }) {
     const b = payment.breakdown;
     const fee = baseFee(payment);
@@ -329,6 +376,7 @@ function BreakdownCard({ payment, onTip, onPay }) {
                     <div className="flex justify-between border-t border-black/50 px-5 py-4 text-xl font-bold"><span>Total Amount Due</span><span>{money(payment.amount)}</span></div>
                     <div className="border-t border-black/50 px-5 py-4">
                         <p className="text-gray-700">&#128274; Payment is required to confirm the session. Tutoring starts once payment clears.</p>
+                        {payment.method_label && String(payment.method_label).startsWith('Cash') && <p className="mt-2 rounded-xl bg-[#FBE7A6] p-2">Cash requested. Waiting for the admin to confirm.</p>}
                         <button type="button" onClick={onPay} className="mt-3 w-full rounded-xl border-[1.5px] border-black bg-white py-2 text-xl hover:opacity-80">Pay</button>
                     </div>
                 </div>
@@ -354,6 +402,10 @@ export default function Index({ payments = [], onlinePaymentsEnabled = false, fl
     const startPay = (payment) => {
         setTarget(payment);
         setFlowError('');
+        if (paymentMethod && paymentMethod.type === 'cash') {
+            setModal('cash');
+            return;
+        }
         setModal(onlinePaymentsEnabled || paymentMethod ? 'summary' : 'method');
     };
 
@@ -408,7 +460,7 @@ export default function Index({ payments = [], onlinePaymentsEnabled = false, fl
                         </div>
                         <div className="flex items-center justify-between gap-4 px-5 py-4">
                             <div className="flex items-center gap-4">
-                                <span className="flex h-14 w-14 items-center justify-center rounded-xl border border-black bg-white text-lg font-bold" style={{ color: paymentMethod ? BRAND[paymentMethod.type] : '#555' }}>{paymentMethod ? (paymentMethod.type === 'gcash' ? 'G' : 'BPI') : '?'}</span>
+                                <span className="flex h-14 w-14 items-center justify-center rounded-xl border border-black bg-white text-lg font-bold" style={{ color: paymentMethod ? BRAND[paymentMethod.type] : '#555' }}>{paymentMethod ? (paymentMethod.type === 'gcash' ? 'G' : paymentMethod.type === 'cash' ? '\u20B1' : 'BPI') : '?'}</span>
                                 <div>
                                     <div className="text-xl">{paymentMethod ? methodText(paymentMethod) : 'No payment method saved yet'}</div>
                                     {paymentMethod && <div className="text-gray-700">{paymentMethod.name}</div>}
@@ -469,7 +521,8 @@ export default function Index({ payments = [], onlinePaymentsEnabled = false, fl
 
             {modal === 'tip' && live && <TipModal payment={live} onClose={() => setModal(null)} />}
             {modal === 'method' && <MethodModal current={paymentMethod} onClose={() => setModal(live && pending.length > 0 && !paymentMethod ? 'summary' : null)} />}
-            {modal === 'summary' && live && (onlinePaymentsEnabled || paymentMethod) && (
+            {(modal === 'cash' || modal === 'summary') && live && paymentMethod && paymentMethod.type === 'cash' && <CashModal payment={live} onClose={() => setModal(null)} onChange={() => setModal('method')} />}
+            {modal === 'summary' && live && (onlinePaymentsEnabled || paymentMethod) && !(paymentMethod && paymentMethod.type === 'cash') && (
                 <SummaryModal payment={live} method={paymentMethod} online={onlinePaymentsEnabled} onClose={() => setModal(null)} onChange={() => setModal('method')} onContinue={() => (onlinePaymentsEnabled ? online() : setModal('checkout'))} />
             )}
             {modal === 'checkout' && live && paymentMethod && (

@@ -17,6 +17,7 @@ test('a booking notifies the parent and tutor', function () {
     ]);
 
     TutorProfile::create([
+        'specializations' => ['Math', 'Reading', 'English', 'Science', 'Special Teaching'],
         'user_id' => $tutor->id,
         'is_verified' => true,
     ]);

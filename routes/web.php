@@ -80,9 +80,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/parent/billing', [BillingController::class, 'index'])->name('parent.billing.index');
     Route::get('/parent/receipts/{payment}', [\App\Http\Controllers\Parent\ReceiptController::class, 'show'])->name('parent.receipts.show');
     Route::get('/parent/gallery', [\App\Http\Controllers\Parent\GalleryController::class, 'index'])->name('parent.gallery.index');
+    Route::get('/online/{session}', [\App\Http\Controllers\OnlineSessionController::class, 'show'])->name('online.show');
+    Route::post('/online/{session}/end', [\App\Http\Controllers\OnlineSessionController::class, 'end'])->name('online.end');
     Route::post('/parent/payments/{payment}/tip', [\App\Http\Controllers\Parent\PaymentFlowController::class, 'tip'])->name('parent.payments.tip');
     Route::post('/parent/payments/{payment}/demo-pay', [\App\Http\Controllers\Parent\PaymentFlowController::class, 'demoPay'])->name('parent.payments.demo');
     Route::patch('/parent/payment-method', [\App\Http\Controllers\Parent\PaymentFlowController::class, 'method'])->name('parent.payment-method.update');
+    Route::post('/parent/payments/{payment}/cash-request', [\App\Http\Controllers\Parent\PaymentFlowController::class, 'cashRequest'])->name('parent.payments.cash-request');
     Route::post('/parent/payments/{payment}/checkout', [PaymentController::class, 'checkout'])->name('parent.payments.checkout');
     Route::get('/parent/payments/{payment}/success', [PaymentController::class, 'success'])->name('parent.payments.success');
     Route::get('/parent/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('parent.payments.cancel');

@@ -11,6 +11,7 @@ function createBookableTutor(): User
     $tutor = User::factory()->create(['role' => 'tutor']);
 
     TutorProfile::create([
+        'specializations' => ['Math', 'Reading', 'English', 'Science', 'Special Teaching'],
         'user_id' => $tutor->id,
         'is_verified' => true,
     ]);
@@ -66,6 +67,7 @@ test('parents cannot book unverified tutors', function () {
     $tutor = User::factory()->create(['role' => 'tutor']);
 
     TutorProfile::create([
+        'specializations' => ['Math', 'Reading', 'English', 'Science', 'Special Teaching'],
         'user_id' => $tutor->id,
         'is_verified' => false,
     ]);

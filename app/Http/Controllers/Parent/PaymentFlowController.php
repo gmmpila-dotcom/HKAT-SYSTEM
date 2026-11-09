@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Parent;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\User;
+use App\Notifications\SessionStatusNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +42,12 @@ class PaymentFlowController extends Controller
             ]);
         }
 
+        if ($user->pay_type === 'cash') {
+            throw ValidationException::withMessages([
+                'payment' => 'Cash payments are confirmed by the admin once the cash is received. Use Request cash payment.',
+            ]);
+        }
+
         if (! $user->pay_type || ! $user->pay_last4) {
             throw ValidationException::withMessages(['payment' => 'Save a payment method first.']);
         }
@@ -58,6 +66,26 @@ class PaymentFlowController extends Controller
         return back()->with('paidPayment', $payment->id);
     }
 
+    public function cashRequest(Request $request, Payment $payment): RedirectResponse
+    {
+        $user = $this->ownPending($request, $payment);
+
+        DB::table('payments')->where('id', $payment->id)->update([
+            'method_label' => 'Cash (waiting for admin)',
+            'updated_at' => now(),
+        ]);
+
+        foreach (User::where('role', 'admin')->get() as $admin) {
+            $admin->notify(new SessionStatusNotification(
+                'Cash payment requested',
+                $user->name.' will pay PHP '.number_format((float) $payment->amount, 2).' in cash. Mark it received once you have it.',
+                route('admin.payments.index'),
+            ));
+        }
+
+        return back()->with('status', 'Cash payment requested. The admin will confirm once the cash is received.');
+    }
+
     public function method(Request $request): RedirectResponse
     {
         $user = $request->user();
@@ -67,12 +95,22 @@ class PaymentFlowController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => ['required', 'in:gcash,bpi'],
-            'number' => ['required', 'string', 'max:30'],
-            'name' => ['required', 'string', 'max:100'],
+            'type' => ['required', 'in:gcash,bpi,cash'],
+            'number' => ['required_unless:type,cash', 'nullable', 'string', 'max:30'],
+            'name' => ['required_unless:type,cash', 'nullable', 'string', 'max:100'],
         ]);
 
-        $digits = preg_replace('/\D+/', '', $validated['number']);
+        if ($validated['type'] === 'cash') {
+            DB::table('users')->where('id', $user->id)->update([
+                'pay_type' => 'cash',
+                'pay_last4' => null,
+                'pay_name' => $validated['name'] ?? $user->name,
+            ]);
+
+            return back()->with('status', 'Payment method updated.');
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $validated['number']);
 
         if ($validated['type'] === 'gcash' && ! preg_match('/^09\d{9}$/', $digits)) {
             throw ValidationException::withMessages(['number' => 'Enter an 11-digit GCash number starting with 09.']);
